@@ -9,6 +9,8 @@ const stripe = require("stripe")(
 
 const multer = require("multer");
 const path = require("path");
+const { type } = require("os");
+const { url } = require("inspector");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -54,7 +56,7 @@ app.post("/create-payment-intent", async (req, res) => {
 
   res.status(200).send({ clientSecret: paymentIntent.client_secret });
 });
-
+//
 //create account
 app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
   try {
@@ -77,6 +79,7 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       dateOfBirth,
       phoneNumber,
       userId,
+      jobTitle, // Extract job title
     } = bodyData;
 
     // Process uploaded files
@@ -84,6 +87,8 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
     if (!files || files.length < 2) {
       return res.status(400).send({ error: "Two KYC files are required." });
     }
+
+    console.log("Uploaded files:", files);
 
     const dob = new Date(dateOfBirth || "1990-02-02");
 
@@ -117,8 +122,8 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
           },
           email: "siffahim25@gmail.com",
           first_name: fullName || "Fahim",
-          last_name: "Smith", // Provide a default last name
-          id_number: userId || "000000000",
+          last_name: "Smith",
+          id_number: userId || "000000000", //ensure must be character 9 digit
           phone: phoneNumber || "+8500414111",
           address: {
             city: address.city,
@@ -162,9 +167,10 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       },
       business_profile: {
         mcc: "7512",
-        name: fullName,
+        name: business_profile?.name || "My Business",
         product_description:
           business_profile?.product_description || "Your business description",
+        url: business_profile?.url || "www.xyz.com",
         support_address: {
           city:
             business_profile?.support_address?.city || address.city || "N/A",
@@ -187,26 +193,19 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       external_account: external_account,
     });
 
-    console.log("~ account", account);
-
     // Create account link for onboarding
-    try {
-      const accountLink = await stripe.accountLinks.create({
-        account: account.id,
-        refresh_url: "https://example.com/reauth",
-        return_url: "https://example.com/return",
-        type: "account_onboarding",
-        collect: "eventually_due",
-      });
-      // logger.info(accountLink);
-      console.log(accountLink);
-    } catch (error) {
-      console.log("🚀 ~ error:", error);
-      // logger.error(error);
-    }
+    const accountLink = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: "https://example.com/reauth",
+      return_url: "https://example.com/return",
+      type: "account_onboarding",
+      collect: "eventually_due",
+    });
 
     // Send success response
-    res.status(200).send({ message: "Stripe connect account created" });
+    res
+      .status(200)
+      .send({ message: "Stripe connect account created", accountLink });
   } catch (error) {
     console.error("Error creating Stripe account:", error);
 
@@ -214,170 +213,6 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
-
-/* app.post("/create-account", upload.array("image", 2), async (req, res) => {
-  try {
-    const bodyData = JSON.parse(req.body.data);
-    const {
-      address,
-      bankInfo,
-      fullName,
-      company_address,
-      business_profile,
-      dateOfBirth,
-      phoneNumber,
-      userId,
-    } = bodyData;
-    console.log("parse", bodyData);
-    const files = req.files;
-    const dob = new Date("1990-02-02");
-
-    console.log(files);
-
-    const fileUploadFrontPart = await stripe.files.create({
-      purpose: "identity_document",
-      file: {
-        data: fs.readFileSync(req.files[0]?.path),
-        name: req.files[0]?.filename,
-        type: req.files[0]?.mimetype,
-      },
-    });
-
-    const backFileUpload = await stripe.files.create({
-      purpose: "identity_document",
-      file: {
-        data: fs.readFileSync(req.files[1]?.path),
-        name: req.files[1]?.filename,
-        type: req.files[1]?.mimetype,
-      },
-    });
-
-    const token = await stripe.tokens.create({
-      account: {
-        company: {
-          address: {
-            city: company_address?.city || address.city || "N/A",
-            country:
-              company_address?.countryShortForm ||
-              address.countryShortForm ||
-              "US",
-            line1: company_address?.line1 || address.line1 || "N/A",
-            line2: company_address?.line2 || address.line2 || "N/A",
-            postal_code:
-              company_address?.postalCode || address.postalCode || "00000",
-            state: company_address?.state || address.state || "N/A",
-          },
-        },
-        individual: {
-          dob: {
-            day: dob.getDate(),
-            month: dob.getMonth() + 1, // Adding 1 because JavaScript months are zero-indexed
-            year: dob.getFullYear(),
-          },
-          email: "siffahim25@gmail.com",
-          first_name: fullName || "Fahim",
-          last_name: " ",
-          id_number: userId,
-          phone: phoneNumber || "+8500414111",
-          address: {
-            city: address.city,
-            country: address.countryShortForm,
-            line1: address.line1,
-            postal_code: address.postalCode,
-            state: address.state,
-          },
-
-          verification: {
-            document: {
-              front: fileUploadFrontPart.id, // Replace with the actual file path
-              back: backFileUpload.id, // Replace with the actual file path
-            },
-          },
-        },
-        business_type: "individual",
-        tos_shown_and_accepted: true,
-      },
-    });
-
-    const external_account = {
-      object: "bank_account",
-      country: address.countryShortForm || "US",
-      currency: bankInfo.currency || "usd",
-      account_holder_name: bankInfo.account_holder_name,
-      account_holder_type: bankInfo.account_holder_type,
-      account_number: bankInfo.account_number,
-      // routing_number: bankInfo.routing_number,
-    };
-    if (bankInfo.routing_number) {
-      external_account.routing_number = bankInfo.routing_number;
-    }
-    const account = await stripe.accounts.create({
-      country: address.countryShortForm,
-      type: "custom",
-      account_token: token.id,
-
-      email: "siffahim25@gmail.com",
-      capabilities: {
-        card_payments: {
-          requested: true,
-        },
-        transfers: {
-          requested: true,
-        },
-      },
-      business_profile: {
-        mcc: "7512", //merchant category codes -> not a vary impotent-->     mcc: '7300', //merchant category codes -> not a vary impotent--> https://stripe.com/guides/merchant-category-codes#:~:text=An%20MCC%20is%20a%20four,key%20piece%20of%20payments%20processing.
-        name: fullName,
-        product_description:
-          business_profile?.product_description || "Your business description",
-        support_address: {
-          city:
-            business_profile?.support_address?.city || address.city || "N/A",
-          country:
-            business_profile?.support_address?.countryShortForm ||
-            address.countryShortForm ||
-            "FR",
-          line1:
-            business_profile?.support_address?.line1 || address.line1 || "N/A",
-          line2:
-            business_profile?.support_address?.line2 || address.line2 || "N/A",
-          postal_code:
-            business_profile?.support_address?.postalCode ||
-            address.postalCode ||
-            "00000",
-          state:
-            business_profile?.support_address?.state || address.state || "N/A",
-        },
-      },
-      external_account: external_account,
-    });
-    console.log("🚀 ~ app.post ~ account:", account);
-
-    if (account.capabilities?.card_payments !== "active") {
-      console.log("first account");
-    }
-    try {
-      const accountLink = await stripe.accountLinks.create({
-        account: account.id,
-        refresh_url: "https://example.com/reauth",
-        return_url: "https://example.com/return",
-        type: "account_onboarding",
-        collect: "eventually_due",
-      });
-      // logger.info(accountLink);
-      console.log(accountLink);
-    } catch (error) {
-      console.log("🚀 ~ error:", error);
-      // logger.error(error);
-    }
-
-    res.status(200).send("stripe connect account");
-  } catch (error) {
-    res.status(200).send(error);
-  }
-});
-
- */
 
 //transfer money
 app.post("/transfer", async (req, res) => {

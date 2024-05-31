@@ -1,6 +1,6 @@
 const express = require("express");
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5004;
 const cors = require("cors");
 const fs = require("fs");
 const stripe = require("stripe")(
@@ -87,10 +87,7 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
     if (!files || files.length < 2) {
       return res.status(400).send({ error: "Two KYC files are required." });
     }
-
-    console.log("Uploaded files:", files);
-
-    const dob = new Date(dateOfBirth || "1990-02-02");
+    const dob = new Date("1990-02-02");
 
     // Upload identity document files
     const fileUploadFrontPart = await stripe.files.create({
@@ -120,17 +117,21 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
             month: dob.getMonth() + 1,
             year: dob.getFullYear(),
           },
-          email: "siffahim25@gmail.com",
-          first_name: fullName || "Fahim",
-          last_name: "Smith",
-          id_number: userId || "000000000", //ensure must be character 9 digit
-          phone: phoneNumber || "+8500414111",
+          email: "siffahim.bdcalling@gmail.com",
+          first_name: "Sif",
+          last_name: "Fahim",
+          relationship: {
+            title: "Backend Developer",
+          },
+          id_number: "000000000", //ensure must be character 9 digit
+          phone: "+16105579304",
           address: {
-            city: address.city,
-            country: address.country || "CA", // Ensure country is set to 'CA'
-            line1: address.line1,
-            postal_code: address.postalCode, // Ensure postal code is valid
-            state: address.state,
+            city: "Oshawa",
+            country: "CA",
+            line1: "55 Thornton Road South",
+            line2: "55 Thornton Road South",
+            postal_code: "L1J 5Y1",
+            state: "ON",
           },
           verification: {
             document: {
@@ -147,47 +148,36 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
     // Create external account (bank account)
     const external_account = {
       object: "bank_account",
-      country: address.country || "CA", // Ensure country is correct
-      currency: bankInfo.currency || "cad",
-      account_holder_name: bankInfo.account_holder_name,
-      account_holder_type: bankInfo.account_holder_type,
-      account_number: bankInfo.account_number,
-      routing_number: bankInfo.routing_number, // Ensure routing number is provided
+      account_holder_name: "Fahim",
+      account_holder_type: "individual",
+      account_number: "000123456789",
+      country: "CA",
+      currency: "cad",
+      routing_number: "11000000",
     };
 
     // Create Stripe account
     const account = await stripe.accounts.create({
-      country: address.country || "CA",
+      country: "CA",
       type: "custom",
       account_token: token.id,
-      email: "siffahim25@gmail.com",
+      email: "siffahim.bdcalling@gmail.com",
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
       business_profile: {
-        mcc: "7512",
-        name: business_profile?.name || "My Business",
-        product_description:
-          business_profile?.product_description || "Your business description",
-        url: business_profile?.url || "www.xyz.com",
+        mcc: "5970",
+        name: "Artist Business",
+        product_description: "Your business description",
+        url: "www.xyz.com",
         support_address: {
-          city:
-            business_profile?.support_address?.city || address.city || "N/A",
-          country:
-            business_profile?.support_address?.countryShortForm ||
-            address.country ||
-            "CA",
-          line1:
-            business_profile?.support_address?.line1 || address.line1 || "N/A",
-          line2:
-            business_profile?.support_address?.line2 || address.line2 || "",
-          postal_code:
-            business_profile?.support_address?.postal_code ||
-            address.postalCode ||
-            "00000",
-          state:
-            business_profile?.support_address?.state || address.state || "N/A",
+          city: "Oshawa",
+          country: "CA",
+          line1: "55 Thornton Road South",
+          line2: "55 Thornton Road South",
+          postal_code: "L1J 5Y1",
+          state: "ON",
         },
       },
       external_account: external_account,
@@ -217,47 +207,32 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
 //transfer money
 app.post("/transfer", async (req, res) => {
   try {
-    const transfer = await stripeService.transfers.create({
+    // const bodyData = JSON.parse(req.body.data);
+    // const {
+    //   address,
+    //   bankInfo,
+    //   fullName,
+    //   company_address,
+    //   business_profile,
+    //   dateOfBirth,
+    //   phoneNumber,
+    //   userId,
+    // } = bodyData;
+    const transfer = await stripe.transfers.create({
       amount: 10 * 100, // count cents -- $4 = 400 cents
-      currency: "usd", //Mx er somoy mxn hobe
+      currency: "cad", //Mx er somoy mxn hobe
       //@ts-ignore
-      destination: "acct_1PM0mD2cp3B7JUAM", //stripeConnectAccountID
+      destination: "acct_1PMNK72clY9hKKnU", //stripeConnectAccountID
       //@ts-ignore
-      transfer_group: createPayment[0]._id.toString(),
+      //transfer_group: createPayment[0]._id.toString(),
     });
 
-    res.status(200).send("transfer ", transfer);
+    res.status(400).send({ message: "Transfer successfully", transfer });
   } catch (error) {
-    res.status(200).send(error);
+    res.status(200).send({ message: error });
   }
 });
 
-/* app.post("/transfer", upload.array("image", 2), async (req, res) => {
-  try {
-    const bodyData = JSON.parse(req.body.data);
-    const {
-      address,
-      bankInfo,
-      fullName,
-      company_address,
-      business_profile,
-      dateOfBirth,
-      phoneNumber,
-      userId,
-    } = bodyData;
-    const transfer = await stripeService.transfers.create({
-      amount: amount * 100, // count cents -- $4 = 400 cents
-      currency: "usd", //Mx er somoy mxn hobe
-      //@ts-ignore
-      destination: shop?.userId?.stripeAccount?.accountNo,, //stripeConnectAccountID
-      //@ts-ignore
-      transfer_group: createPayment[0]._id.toString(),
-    });
-  } catch (error) {
-    res.status(200).send(error);
-  }
-});
- */
 app.listen(port, () => {
   console.log("Application listening on port:", port);
 });

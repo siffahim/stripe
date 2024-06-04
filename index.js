@@ -50,7 +50,7 @@ app.post("/create-payment-intent", async (req, res) => {
   const amount = Math.trunc(price * 100);
   const paymentIntent = await stripe.paymentIntents.create({
     amount: amount,
-    currency: "usd",
+    currency: "eur",
     payment_method_types: ["card"],
   });
 
@@ -60,34 +60,11 @@ app.post("/create-payment-intent", async (req, res) => {
 //create account
 app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
   try {
-    // Parse request body
-    let bodyData;
-    try {
-      bodyData = JSON.parse(req.body.data);
-    } catch (jsonError) {
-      return res
-        .status(400)
-        .send({ error: "Invalid JSON data in request body." });
-    }
-
-    const {
-      address,
-      bankInfo,
-      fullName,
-      company_address,
-      business_profile,
-      dateOfBirth,
-      phoneNumber,
-      userId,
-      jobTitle, // Extract job title
-    } = bodyData;
-
     // Process uploaded files
     const files = req.files;
     if (!files || files.length < 2) {
       return res.status(400).send({ error: "Two KYC files are required." });
     }
-    const dob = new Date("1990-02-02");
 
     // Upload identity document files
     const fileUploadFrontPart = await stripe.files.create({
@@ -113,25 +90,19 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       account: {
         individual: {
           dob: {
-            day: dob.getDate(),
-            month: dob.getMonth() + 1,
-            year: dob.getFullYear(),
+            day: "25",
+            month: "09",
+            year: "2001",
           },
           email: "siffahim.bdcalling@gmail.com",
           first_name: "Sif",
           last_name: "Fahim",
-          relationship: {
-            title: "Backend Developer",
-          },
-          id_number: "000000000", //ensure must be character 9 digit
-          phone: "+16105579304",
+          phone: "+33781858334",
           address: {
-            city: "Oshawa",
-            country: "CA",
-            line1: "55 Thornton Road South",
-            line2: "55 Thornton Road South",
-            postal_code: "L1J 5Y1",
-            state: "ON",
+            city: "Aubervilliers",
+            line1: "56 rue du landy",
+            postal_code: "93300",
+            country: "FR",
           },
           verification: {
             document: {
@@ -150,15 +121,14 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       object: "bank_account",
       account_holder_name: "Fahim",
       account_holder_type: "individual",
-      account_number: "000123456789",
-      country: "CA",
-      currency: "cad",
-      routing_number: "11000000",
+      account_number: "FR1420041010050500013M02606",
+      country: "FR",
+      currency: "eur",
     };
 
     // Create Stripe account
     const account = await stripe.accounts.create({
-      country: "CA",
+      country: "FR",
       type: "custom",
       account_token: token.id,
       email: "siffahim.bdcalling@gmail.com",
@@ -168,20 +138,20 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       },
       business_profile: {
         mcc: "5970",
+        url: "www.xyz.com",
         name: "Artist Business",
         product_description: "Your business description",
-        url: "www.xyz.com",
         support_address: {
-          city: "Oshawa",
-          country: "CA",
-          line1: "55 Thornton Road South",
-          line2: "55 Thornton Road South",
-          postal_code: "L1J 5Y1",
-          state: "ON",
+          city: "Aubervilliers",
+          country: "FR",
+          line1: "56 rue du landy",
+          postal_code: "93300",
         },
       },
       external_account: external_account,
     });
+
+    console.log(account.external_accounts.data[0].id);
 
     // Create account link for onboarding
     const accountLink = await stripe.accountLinks.create({
@@ -198,7 +168,6 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
       .send({ message: "Stripe connect account created", accountLink });
   } catch (error) {
     console.error("Error creating Stripe account:", error);
-
     // Send error response
     res.status(500).send({ error: error.message });
   }
@@ -207,28 +176,32 @@ app.post("/create-account", upload.array("KYC", 2), async (req, res) => {
 //transfer money
 app.post("/transfer", async (req, res) => {
   try {
-    // const bodyData = JSON.parse(req.body.data);
-    // const {
-    //   address,
-    //   bankInfo,
-    //   fullName,
-    //   company_address,
-    //   business_profile,
-    //   dateOfBirth,
-    //   phoneNumber,
-    //   userId,
-    // } = bodyData;
     const transfer = await stripe.transfers.create({
-      amount: 10 * 100, // count cents -- $4 = 400 cents
-      currency: "cad", //Mx er somoy mxn hobe
-      //@ts-ignore
-      destination: "acct_1PMNK72clY9hKKnU", //stripeConnectAccountID
-      //@ts-ignore
-      //transfer_group: createPayment[0]._id.toString(),
+      amount: 5 * 100,
+      currency: "eur",
+      destination: "acct_1PNun0GdZpO2byQu",
     });
 
-    res.status(400).send({ message: "Transfer successfully", transfer });
+    const payouts = await stripe.payouts.create(
+      {
+        amount: 5 * 100,
+        currency: "eur",
+        //method: "instant",
+        destination: "ba_1PNun1GdZpO2byQuR0sML48a",
+      },
+      {
+        stripeAccount: "acct_1PNun0GdZpO2byQu",
+      }
+    );
+
+    console.log("payouts", payouts);
+    res.status(200).send({
+      message: "Transfer and payout created successfully",
+      transfer,
+      payouts,
+    });
   } catch (error) {
+    console.log({ error: error });
     res.status(200).send({ message: error });
   }
 });
